@@ -1,0 +1,6 @@
+# Compilação
+mpicc main.c jacobi_seq.c jacobi_parMPI.c -o jacobi -lm
+# Execução
+mpirun -np 4 ./jacobi
+Onde:
+-np 4 define a quantidade de processos MPI.
