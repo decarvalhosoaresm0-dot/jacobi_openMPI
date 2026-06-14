@@ -5,6 +5,7 @@
 
 #define N 1000
 #define SEED 42
+#define NUM_CHECKPOINTS 5
 
 // functions declarations
 int jacobi_sequential(int n, double A[n][n], double b[n], double x[n], int max_iter, double tol, double *final_error);
@@ -118,26 +119,32 @@ int main(int argc, char *argv[]) {
 
     // ----------------- SEQUENTIAL -----------------
     double time_seq = 0.0;
-
     int iter_seq = 0;
 
     if(rank == 0){
-
-        double start = MPI_Wtime();
-
+        double start_seq = MPI_Wtime();
         iter_seq = jacobi_sequential(N, A, b, x_seq, max_iter, tol, &error_seq);
-
-        time_seq = MPI_Wtime() - start;
+        time_seq = MPI_Wtime() - start_seq;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
     // ----------------- MPI Parallel -----------------
-    double start = MPI_Wtime();
+    double start_par = MPI_Wtime();
+    int iter_par = jacobi_parallel_mpi(
+        N,
+        A,
+        b,
+        x_par,
+        max_iter,
+        tol,
+        &error_par
+    );
+    double local_time_par = MPI_Wtime() - start_par;
 
-    int iter_par = jacobi_parallel_mpi(N, A, b, x_par, max_iter, tol, &error_par);
-
-    double time_par = MPI_Wtime() - start;
+    // elapsed time of a parallel program is the time of the slowest process
+    double time_par = 0.0;
+    MPI_Reduce(&local_time_par, &time_par, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
     // ------------------ RESULTS -----------------
     if(rank == 0){
@@ -148,12 +155,16 @@ int main(int argc, char *argv[]) {
         printf("Iterations: %d\n", iter_seq);
         printf("Final error: %e\n", error_seq);
         printf("Time: %f seconds\n\n", time_seq);
+
         printf("=== MPI Parallel ===\n");
         printf("Iterations: %d\n", iter_par);
         printf("Final error: %e\n", error_par);
         printf("Time: %f seconds\n\n", time_par);
-        printf("Speedup: %f\n", speedup);
-        printf("Efficiency: %f\n", speedup / size);
+
+        printf("=== Performance Metrics ===\n");
+        printf("Speedup vs Sequential: %f\n", speedup);
+        printf("Efficiency: %f\n\n", speedup/size);
+
     }
 
     MPI_Finalize();
